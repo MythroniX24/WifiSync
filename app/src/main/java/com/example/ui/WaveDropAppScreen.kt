@@ -31,7 +31,7 @@ fun WaveDropAppScreen(viewModel: WaveDropViewModel) {
             composable("shared_space") { SharedSpaceScreen(viewModel) }
             composable("devices") { DevicesScreen(viewModel) }
             composable("history") { HistoryScreen(viewModel) }
-            composable("settings") { SettingsScreen() }
+            composable("settings") { SettingsScreen(viewModel) }
         }
     }
 }

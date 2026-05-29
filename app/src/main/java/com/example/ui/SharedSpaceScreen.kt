@@ -1,16 +1,21 @@
 package com.example.ui
 
+import android.net.Uri
+import android.provider.OpenableColumns
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Send
+import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -18,6 +23,35 @@ import com.example.domain.WaveDropViewModel
 
 @Composable
 fun SharedSpaceScreen(viewModel: WaveDropViewModel) {
+    val context = LocalContext.current
+    
+    // Real system file selector launcher
+    val fileLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        uri?.let { selectedUri ->
+            var fileName = "Unnamed_Payload"
+            var fileSize = 0L
+            
+            // Query real content resolver to resolve file metadata
+            try {
+                context.contentResolver.query(selectedUri, null, null, null, null)?.use { cursor ->
+                    val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                    val sizeIndex = cursor.getColumnIndex(OpenableColumns.SIZE)
+                    if (cursor.moveToFirst()) {
+                        if (nameIndex != -1) fileName = cursor.getString(nameIndex)
+                        if (sizeIndex != -1) fileSize = cursor.getLong(sizeIndex)
+                    }
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+            
+            // Add a proper historical record
+            viewModel.addOutgoingTransfer(fileName, fileSize, "LAN Shared Space")
+        }
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -34,18 +68,26 @@ fun SharedSpaceScreen(viewModel: WaveDropViewModel) {
                 .background(MaterialTheme.colorScheme.primaryContainer),
             contentAlignment = Alignment.Center
         ) {
-            Icon(Icons.Default.Send, contentDescription = "Send", modifier = Modifier.size(64.dp), tint = MaterialTheme.colorScheme.onPrimaryContainer)
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.Send, 
+                contentDescription = "Send", 
+                modifier = Modifier.size(64.dp), 
+                tint = MaterialTheme.colorScheme.onPrimaryContainer
+            )
         }
         
         Spacer(modifier = Modifier.height(32.dp))
         
         Text("Shared Space", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
-        Text("Drop files here to share with everyone nearby.", fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text("Select files to broadcast to everyone nearby.", fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
         
         Spacer(modifier = Modifier.weight(1f))
         
-        FloatingActionButton(onClick = { /* Upload Trigger */ }, modifier = Modifier.align(Alignment.End)) {
-            Icon(Icons.Default.Add, contentDescription = "Upload")
+        FloatingActionButton(
+            onClick = { fileLauncher.launch("*/*") }, 
+            modifier = Modifier.align(Alignment.End)
+        ) {
+            Icon(Icons.Default.Add, contentDescription = "Choose File")
         }
     }
 }
