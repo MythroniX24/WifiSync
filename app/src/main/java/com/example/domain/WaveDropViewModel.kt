@@ -238,22 +238,34 @@ class WaveDropViewModel(application: Application, private val repository: WaveDr
                         if (isAccepted) {
                             val context = getApplication<Application>()
                             val downloadDir = File(context.filesDir, "shared_downloads").apply { mkdirs() }
-                            val targetFile = File(downloadDir, "${System.currentTimeMillis()}_${fileName}")
+                            val targetTempFile = File(downloadDir, "${System.currentTimeMillis()}_${fileName}.tmp")
+                            val targetFinalFile = File(downloadDir, "${System.currentTimeMillis()}_${fileName}")
                             
                             output.write("READY\n".toByteArray())
                             output.flush()
                             
                             var bytesCopied = 0L
-                            targetFile.outputStream().use { outFil ->
-                                val buffer = ByteArray(512 * 1024)
-                                while (bytesCopied < fileSize) {
-                                    val remaining = fileSize - bytesCopied
-                                    val toRead = if (remaining < buffer.size) remaining.toInt() else buffer.size
-                                    val amt = input.read(buffer, 0, toRead)
-                                    if (amt == -1) break
-                                    outFil.write(buffer, 0, amt)
-                                    bytesCopied += amt
+                            try {
+                                targetTempFile.outputStream().use { outFil ->
+                                    val buffer = ByteArray(512 * 1024)
+                                    while (bytesCopied < fileSize) {
+                                        val remaining = fileSize - bytesCopied
+                                        val toRead = if (remaining < buffer.size) remaining.toInt() else buffer.size
+                                        val amt = input.read(buffer, 0, toRead)
+                                        if (amt == -1) break
+                                        outFil.write(buffer, 0, amt)
+                                        bytesCopied += amt
+                                    }
                                 }
+                                if (bytesCopied >= fileSize) {
+                                    targetTempFile.renameTo(targetFinalFile)
+                                } else {
+                                    targetTempFile.delete()
+                                    throw Exception("Incomplete stream")
+                                }
+                            } catch (e: Exception) {
+                                targetTempFile.delete()
+                                throw e
                             }
                             
                             val fileExt = fileName.substringAfterLast('.', "")
@@ -262,7 +274,7 @@ class WaveDropViewModel(application: Application, private val repository: WaveDr
                                 size = bytesCopied,
                                 isLocal = true,
                                 ownerDeviceName = senderName,
-                                localFilePath = targetFile.absolutePath,
+                                localFilePath = targetFinalFile.absolutePath,
                                 fileExtension = fileExt.lowercase()
                             )
                             repository.addSharedFile(entity)
@@ -438,19 +450,31 @@ class WaveDropViewModel(application: Application, private val repository: WaveDr
                         
                         val context = getApplication<Application>()
                         val downloadDir = File(context.filesDir, "shared_downloads").apply { mkdirs() }
-                        val downloadedFile = File(downloadDir, file.name)
+                        val tempDownloadedFile = File(downloadDir, "${file.name}.tmp")
+                        val finalDownloadedFile = File(downloadDir, file.name)
 
                         var bytesCopied = 0L
-                        downloadedFile.outputStream().use { fileOut ->
-                            val buffer = ByteArray(512 * 1024)
-                            while (bytesCopied < size) {
-                                val remaining = size - bytesCopied
-                                val toRead = if (remaining < buffer.size) remaining.toInt() else buffer.size
-                                val amt = input.read(buffer, 0, toRead)
-                                if (amt == -1) break
-                                fileOut.write(buffer, 0, amt)
-                                bytesCopied += amt
+                        try {
+                            tempDownloadedFile.outputStream().use { fileOut ->
+                                val buffer = ByteArray(512 * 1024)
+                                while (bytesCopied < size) {
+                                    val remaining = size - bytesCopied
+                                    val toRead = if (remaining < buffer.size) remaining.toInt() else buffer.size
+                                    val amt = input.read(buffer, 0, toRead)
+                                    if (amt == -1) break
+                                    fileOut.write(buffer, 0, amt)
+                                    bytesCopied += amt
+                                }
                             }
+                            if (bytesCopied >= size) {
+                                tempDownloadedFile.renameTo(finalDownloadedFile)
+                            } else {
+                                tempDownloadedFile.delete()
+                                throw Exception("Incomplete transfer")
+                            }
+                        } catch (e: Exception) {
+                            tempDownloadedFile.delete()
+                            throw e
                         }
 
                         val ext = file.name.substringAfterLast('.', "")
@@ -458,7 +482,7 @@ class WaveDropViewModel(application: Application, private val repository: WaveDr
                             id = java.util.UUID.randomUUID().toString(),
                             isLocal = true,
                             ownerDeviceName = _deviceName.value,
-                            localFilePath = downloadedFile.absolutePath,
+                            localFilePath = finalDownloadedFile.absolutePath,
                             fileExtension = ext.lowercase()
                         )
                         repository.addSharedFile(localEntity)

@@ -38,20 +38,35 @@ class NsdDiscoveryManager(context: Context) {
         return "127.0.0.1"
     }
 
+    private val handler = android.os.Handler(android.os.Looper.getMainLooper())
+    private var resolveTimeoutRunnable: Runnable? = null
+
     private fun resolveNext() {
         if (isResolving || pendingResolves.isEmpty()) return
         val service = pendingResolves.removeAt(0)
         isResolving = true
+        
+        resolveTimeoutRunnable = Runnable {
+            if (isResolving) {
+                Log.e("NSD", "Resolve timed out for ${service.serviceName}")
+                isResolving = false
+                resolveNext()
+            }
+        }
+        handler.postDelayed(resolveTimeoutRunnable!!, 5000)
+
         try {
             nsdManager.resolveService(service, object : NsdManager.ResolveListener {
                 override fun onResolveFailed(serviceInfo: NsdServiceInfo, errorCode: Int) {
                     Log.e("NSD", "Resolve failed: $errorCode")
+                    resolveTimeoutRunnable?.let { handler.removeCallbacks(it) }
                     isResolving = false
                     resolveNext()
                 }
 
                 override fun onServiceResolved(serviceInfo: NsdServiceInfo) {
                     Log.d("NSD", "Resolve Succeeded: $serviceInfo")
+                    resolveTimeoutRunnable?.let { handler.removeCallbacks(it) }
                     val hostAddress = serviceInfo.host?.hostAddress ?: ""
                     // Skip if it's our own registered service or own IP device
                     if (serviceInfo.serviceName != activeServiceName && hostAddress != getLocalIpAddress()) {
@@ -67,6 +82,7 @@ class NsdDiscoveryManager(context: Context) {
             })
         } catch (e: Exception) {
             Log.e("NSD", "Resolve crash", e)
+            resolveTimeoutRunnable?.let { handler.removeCallbacks(it) }
             isResolving = false
             resolveNext()
         }
