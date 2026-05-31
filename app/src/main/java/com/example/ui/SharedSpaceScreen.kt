@@ -318,7 +318,7 @@ fun SharedSpaceScreen(viewModel: WaveDropViewModel) {
                     modifier = Modifier.weight(1f),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    items(sharedFiles) { file ->
+                    items(sharedFiles, key = { it.id }) { file ->
                         val containerColor = when {
                             file.isFolder -> MaterialTheme.colorScheme.secondaryContainer
                             file.isFavorite -> MaterialTheme.colorScheme.tertiaryContainer

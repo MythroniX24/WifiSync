@@ -157,7 +157,7 @@ fun DevicesScreen(viewModel: WaveDropViewModel) {
                 contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                items(devices) { device ->
+                items(devices, key = { it.id }) { device ->
                     val rawName = device.name
                     val ipPart = rawName.substringAfterLast("(").substringBefore(")")
                     val rawDevicePart = rawName.substringBefore(" (")

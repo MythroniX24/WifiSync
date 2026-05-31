@@ -37,7 +37,7 @@ fun HistoryScreen(viewModel: WaveDropViewModel) {
                 contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                items(history) { transfer ->
+                items(history, key = { it.id }) { transfer ->
                     Card(modifier = Modifier.fillMaxWidth()) {
                         Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
                             Icon(
