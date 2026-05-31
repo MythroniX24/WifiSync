@@ -1,29 +1,37 @@
 package com.example.data
 
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.update
 
-class WaveDropRepository {
-    private val _devices = MutableStateFlow<List<DeviceEntity>>(emptyList())
-    val devices: Flow<List<DeviceEntity>> = _devices.asStateFlow()
-
-    private val _transferHistory = MutableStateFlow<List<TransferHistoryEntity>>(emptyList())
-    val transferHistory: Flow<List<TransferHistoryEntity>> = _transferHistory.asStateFlow()
+class WaveDropRepository(private val dao: WaveDropDao) {
+    val devices: Flow<List<DeviceEntity>> = dao.getAllDevices()
+    val transferHistory: Flow<List<TransferHistoryEntity>> = dao.getTransferHistory()
+    val sharedFiles: Flow<List<SharedFileEntity>> = dao.getSharedFiles()
 
     suspend fun addDevice(device: DeviceEntity) {
-        _devices.update { current ->
-            val updated = current.toMutableList()
-            updated.removeAll { it.id == device.id }
-            updated.add(device)
-            updated
-        }
+        dao.insertDevice(device)
+    }
+
+    suspend fun deleteDevice(deviceId: String) {
+        dao.deleteDevice(deviceId)
+    }
+
+    suspend fun clearAllDevices() {
+        dao.clearAllDevices()
     }
 
     suspend fun addTransferHistory(history: TransferHistoryEntity) {
-        _transferHistory.update { current ->
-            current + history
-        }
+        dao.insertTransferHistory(history)
+    }
+
+    suspend fun addSharedFile(file: SharedFileEntity) {
+        dao.insertSharedFile(file)
+    }
+
+    suspend fun deleteSharedFile(file: SharedFileEntity) {
+        dao.deleteSharedFile(file)
+    }
+
+    suspend fun clearRemoteFiles() {
+        dao.clearRemoteFiles()
     }
 }

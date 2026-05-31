@@ -13,7 +13,7 @@ object DatabaseProvider {
                 context.applicationContext,
                 AppDatabase::class.java,
                 "wave_drop_database"
-            ).build()
+            ).fallbackToDestructiveMigration(true).build()
             INSTANCE = instance
             instance
         }

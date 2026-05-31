@@ -16,6 +16,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.example.domain.WaveDropViewModel
+import androidx.compose.ui.platform.testTag
 
 @Composable
 fun WaveDropAppScreen(viewModel: WaveDropViewModel) {
@@ -51,6 +52,7 @@ fun WaveDropBottomBar(navController: NavHostController) {
                 icon = { Icon(icons[index], contentDescription = labels[index]) },
                 label = { Text(labels[index]) },
                 selected = currentRoute == route,
+                modifier = Modifier.testTag("nav_item_${route}"),
                 onClick = {
                     navController.navigate(route) {
                         popUpTo(navController.graph.startDestinationId) { saveState = true }

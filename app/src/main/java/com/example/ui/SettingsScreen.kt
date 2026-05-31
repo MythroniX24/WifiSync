@@ -10,6 +10,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.domain.WaveDropViewModel
 
+import androidx.compose.ui.platform.testTag
 @Composable
 fun SettingsScreen(viewModel: WaveDropViewModel) {
     val deviceName by viewModel.deviceName.collectAsStateWithLifecycle()
@@ -30,13 +31,13 @@ fun SettingsScreen(viewModel: WaveDropViewModel) {
         
         Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
             Text("Auto-accept files from known devices", modifier = Modifier.weight(1f))
-            Switch(checked = autoAccept, onCheckedChange = { viewModel.toggleAutoAccept(it) })
+            Switch(checked = autoAccept, onCheckedChange = { viewModel.toggleAutoAccept(it) }, modifier = Modifier.testTag("auto_accept_switch"))
         }
         
         Spacer(modifier = Modifier.height(16.dp))
         Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
             Text("Enable Local Encryption", modifier = Modifier.weight(1f))
-            Switch(checked = encryptionEnabled, onCheckedChange = { viewModel.toggleEncryption(it) })
+            Switch(checked = encryptionEnabled, onCheckedChange = { viewModel.toggleEncryption(it) }, modifier = Modifier.testTag("encryption_switch"))
         }
     }
 }
