@@ -29,6 +29,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -45,10 +46,13 @@ fun SharedSpaceScreen(viewModel: WaveDropViewModel) {
     val context = LocalContext.current
     val allSharedFiles by viewModel.sharedFiles.collectAsStateWithLifecycle()
     
+    val activeTransfers by viewModel.activeTransfers.collectAsStateWithLifecycle()
+    
     var showCreateFileDialog by remember { mutableStateOf(false) }
     var showCreateFolderDialog by remember { mutableStateOf(false) }
     var showViewContentDialog by remember { mutableStateOf<String?>(null) } 
     var searchQuery by remember { mutableStateOf("") }
+    var selectedCategory by remember { mutableStateOf("All") }
     
     var currentFolderId by remember { mutableStateOf<String?>(null) }
     var currentFolderName by remember { mutableStateOf<String?>(null) }
@@ -78,12 +82,20 @@ fun SharedSpaceScreen(viewModel: WaveDropViewModel) {
         allSharedFiles.filter { it.parentId == currentFolderId }
     }
 
-    // Filter by live search query
-    val sharedFiles = remember(folderSharedFiles, searchQuery) {
-        if (searchQuery.isBlank()) {
+    // Filter by live search query and categories
+    val sharedFiles = remember(folderSharedFiles, searchQuery, selectedCategory) {
+        val listed = if (searchQuery.isBlank()) {
             folderSharedFiles
         } else {
             folderSharedFiles.filter { it.name.contains(searchQuery, ignoreCase = true) }
+        }
+        
+        when (selectedCategory) {
+            "Images" -> listed.filter { it.isFolder || it.fileExtension in listOf("png", "jpg", "jpeg", "webp", "gif") }
+            "Audio" -> listed.filter { it.isFolder || it.fileExtension in listOf("mp3", "wav", "ogg", "m4a") }
+            "Texts" -> listed.filter { it.isFolder || it.fileExtension in listOf("txt", "pdf", "doc", "docx", "md") }
+            "Links" -> listed.filter { it.isFolder || (it.content != null && android.util.Patterns.WEB_URL.matcher(it.content).find()) }
+            else -> listed
         }
     }
 
@@ -235,6 +247,21 @@ fun SharedSpaceScreen(viewModel: WaveDropViewModel) {
                 }
             }
 
+            // Categories Filter Row
+            val categories = listOf("All", "Images", "Audio", "Texts", "Links")
+            androidx.compose.foundation.lazy.LazyRow(
+                modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                items(categories) { cat ->
+                    FilterChip(
+                        selected = selectedCategory == cat,
+                        onClick = { selectedCategory = cat },
+                        label = { Text(cat) }
+                    )
+                }
+            }
+
             // Real-time live files filter box
             OutlinedTextField(
                 value = searchQuery,
@@ -335,12 +362,24 @@ fun SharedSpaceScreen(viewModel: WaveDropViewModel) {
                             elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
                         ) {
                             Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                                Icon(
-                                    imageVector = fileIcon, 
-                                    contentDescription = null,
-                                    tint = iconColor,
-                                    modifier = Modifier.size(28.dp)
-                                )
+                                val isImage = file.fileExtension in listOf("png", "jpg", "jpeg", "webp", "gif")
+                                if (isImage && file.localFilePath != null) {
+                                    androidx.compose.foundation.shape.RoundedCornerShape(8.dp).let { imgShape ->
+                                        coil.compose.AsyncImage(
+                                            model = File(file.localFilePath),
+                                            contentDescription = null,
+                                            contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                                            modifier = Modifier.size(48.dp).clip(imgShape).background(Color.Gray.copy(0.2f))
+                                        )
+                                    }
+                                } else {
+                                    Icon(
+                                        imageVector = fileIcon, 
+                                        contentDescription = null,
+                                        tint = iconColor,
+                                        modifier = Modifier.size(28.dp)
+                                    )
+                                }
                                 Spacer(modifier = Modifier.width(16.dp))
                                 Column(modifier = Modifier.weight(1f)) {
                                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -375,6 +414,17 @@ fun SharedSpaceScreen(viewModel: WaveDropViewModel) {
                                             text = "Folder • Owner: ${file.ownerDeviceName}", 
                                             style = MaterialTheme.typography.bodySmall,
                                             color = onContainerColor.copy(alpha = 0.8f)
+                                        )
+                                    }
+                                    
+                                    activeTransfers[file.id]?.let { progress ->
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                        LinearProgressIndicator(
+                                            progress = { progress },
+                                            modifier = Modifier.fillMaxWidth().height(4.dp),
+                                            color = MaterialTheme.colorScheme.primary,
+                                            trackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
+                                            strokeCap = androidx.compose.ui.graphics.StrokeCap.Round
                                         )
                                     }
                                 }
@@ -416,12 +466,43 @@ fun SharedSpaceScreen(viewModel: WaveDropViewModel) {
         }
         
         if (showViewContentDialog != null) {
+            val contentStr = showViewContentDialog ?: ""
+            val matcher = android.util.Patterns.WEB_URL.matcher(contentStr)
+            val firstLink = if (matcher.find()) matcher.group() else null
+
             AlertDialog(
                 onDismissRequest = { showViewContentDialog = null },
                 title = { Text("File Content") },
-                text = { Text(showViewContentDialog ?: "") },
+                text = { 
+                    androidx.compose.foundation.text.selection.SelectionContainer {
+                        Text(contentStr)
+                    }
+                },
                 confirmButton = {
                     TextButton(onClick = { showViewContentDialog = null }) { Text("Close") }
+                },
+                dismissButton = {
+                    Row {
+                        if (firstLink != null) {
+                            TextButton(onClick = {
+                                val url = if (!firstLink.startsWith("http://") && !firstLink.startsWith("https://")) {
+                                    "http://$firstLink"
+                                } else firstLink
+                                val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url))
+                                try {
+                                    context.startActivity(intent)
+                                } catch (e: Exception) {
+                                    Toast.makeText(context, "No app to open link", Toast.LENGTH_SHORT).show()
+                                }
+                            }) { Text("Open Link") }
+                        }
+                        TextButton(onClick = {
+                            val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                            val clip = android.content.ClipData.newPlainText("Copied Text", contentStr)
+                            clipboard.setPrimaryClip(clip)
+                            Toast.makeText(context, "Text copied", Toast.LENGTH_SHORT).show()
+                        }) { Text("Copy Text") }
+                    }
                 }
             )
         }

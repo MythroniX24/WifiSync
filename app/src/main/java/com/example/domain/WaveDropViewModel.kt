@@ -113,6 +113,9 @@ class WaveDropViewModel(application: Application, private val repository: WaveDr
 
     val localIpAddress: String = retrieveLocalIpAddress()
 
+    private val _activeTransfers = MutableStateFlow<Map<String, Float>>(emptyMap())
+    val activeTransfers: StateFlow<Map<String, Float>> = _activeTransfers
+
     init {
         // Start background sync routine & Server Socket
         viewModelScope.launch(Dispatchers.IO) {
@@ -457,6 +460,7 @@ class WaveDropViewModel(application: Application, private val repository: WaveDr
                         try {
                             tempDownloadedFile.outputStream().use { fileOut ->
                                 val buffer = ByteArray(512 * 1024)
+                                var lastUpdate = System.currentTimeMillis()
                                 while (bytesCopied < size) {
                                     val remaining = size - bytesCopied
                                     val toRead = if (remaining < buffer.size) remaining.toInt() else buffer.size
@@ -464,6 +468,13 @@ class WaveDropViewModel(application: Application, private val repository: WaveDr
                                     if (amt == -1) break
                                     fileOut.write(buffer, 0, amt)
                                     bytesCopied += amt
+                                    
+                                    val now = System.currentTimeMillis()
+                                    if (now - lastUpdate > 250 || bytesCopied >= size) {
+                                        lastUpdate = now
+                                        val progress = if (size > 0) bytesCopied.toFloat() / size else 1f
+                                        _activeTransfers.value = _activeTransfers.value + (file.id to progress)
+                                    }
                                 }
                             }
                             if (bytesCopied >= size) {
@@ -475,6 +486,8 @@ class WaveDropViewModel(application: Application, private val repository: WaveDr
                         } catch (e: Exception) {
                             tempDownloadedFile.delete()
                             throw e
+                        } finally {
+                            _activeTransfers.value = _activeTransfers.value - file.id
                         }
 
                         val ext = file.name.substringAfterLast('.', "")
@@ -552,8 +565,24 @@ class WaveDropViewModel(application: Application, private val repository: WaveDr
                         context.contentResolver.openInputStream(uri)?.use { fileIn ->
                             val buffer = ByteArray(512 * 1024)
                             var read: Int
-                            while (fileIn.read(buffer).also { read = it } != -1) {
-                                output.write(buffer, 0, read)
+                            var bytesSent = 0L
+                            var lastUpdate = System.currentTimeMillis()
+                            
+                            val transferId = java.util.UUID.randomUUID().toString()
+                            try {
+                                while (fileIn.read(buffer).also { read = it } != -1) {
+                                    output.write(buffer, 0, read)
+                                    bytesSent += read
+                                    
+                                    val now = System.currentTimeMillis()
+                                    if (now - lastUpdate > 250 || bytesSent >= fileSize) {
+                                        lastUpdate = now
+                                        val progress = if (fileSize > 0) bytesSent.toFloat() / fileSize else 1f
+                                        _activeTransfers.value = _activeTransfers.value + (transferId to progress)
+                                    }
+                                }
+                            } finally {
+                                _activeTransfers.value = _activeTransfers.value - transferId
                             }
                         }
                         output.flush()
