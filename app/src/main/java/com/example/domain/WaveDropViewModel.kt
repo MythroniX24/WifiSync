@@ -278,6 +278,12 @@ class WaveDropViewModel(application: Application, private val repository: WaveDr
                                     status = "COMPLETED"
                                 )
                             )
+                            com.example.utils.WaveDropNotificationHelper.showFileTransferNotification(
+                                context,
+                                fileName = fileName,
+                                senderName = senderName,
+                                sizeBytes = bytesCopied
+                            )
                         } else {
                             output.write("DENIED\n".toByteArray())
                             output.flush()
@@ -458,6 +464,12 @@ class WaveDropViewModel(application: Application, private val repository: WaveDr
                                 peerName = file.ownerDeviceName,
                                 status = "COMPLETED"
                             )
+                        )
+                        com.example.utils.WaveDropNotificationHelper.showFileTransferNotification(
+                            context,
+                            fileName = file.name,
+                            senderName = file.ownerDeviceName,
+                            sizeBytes = size
                         )
 
                         withContext(Dispatchers.Main) {
@@ -791,6 +803,12 @@ class WaveDropViewModel(application: Application, private val repository: WaveDr
                                 peerName = "Windows Web Portal",
                                 status = "COMPLETED"
                             )
+                        )
+                        com.example.utils.WaveDropNotificationHelper.showFileTransferNotification(
+                            context,
+                            fileName = pName,
+                            senderName = "Windows Web Portal",
+                            sizeBytes = targetFile.length()
                         )
                         
                         val jsonRes = "{\"success\": true}"

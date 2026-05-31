@@ -51,6 +51,7 @@ class MainActivity : ComponentActivity() {
     permissions.add(Manifest.permission.ACCESS_FINE_LOCATION)
     if (Build.VERSION.SDK_INT >= 33) {
       permissions.add(Manifest.permission.NEARBY_WIFI_DEVICES)
+      permissions.add(Manifest.permission.POST_NOTIFICATIONS)
     }
 
     val missing = permissions.filter {
