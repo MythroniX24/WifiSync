@@ -478,8 +478,23 @@ fun SharedSpaceScreen(viewModel: WaveDropViewModel) {
                             } else if (file.localFilePath != null) {
                                 val diskFile = File(file.localFilePath)
                                 if (diskFile.exists()) {
-                                    // Local view alert
-                                    Toast.makeText(context, "Local file resides at: ${diskFile.name}", Toast.LENGTH_LONG).show()
+                                    // Open file intent
+                                    try {
+                                        val uri = androidx.core.content.FileProvider.getUriForFile(
+                                            context,
+                                            "${context.packageName}.provider",
+                                            diskFile
+                                        )
+                                        val ext = diskFile.extension.lowercase()
+                                        val mime = android.webkit.MimeTypeMap.getSingleton().getMimeTypeFromExtension(ext) ?: "*/*"
+                                        val intent = android.content.Intent(android.content.Intent.ACTION_VIEW).apply {
+                                            setDataAndType(uri, mime)
+                                            addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                        }
+                                        context.startActivity(android.content.Intent.createChooser(intent, "Open File"))
+                                    } catch (e: Exception) {
+                                        Toast.makeText(context, "Could not open file.", Toast.LENGTH_LONG).show()
+                                    }
                                 } else {
                                     Toast.makeText(context, "Payload resides safely on LAN server.", Toast.LENGTH_LONG).show()
                                 }
@@ -489,7 +504,7 @@ fun SharedSpaceScreen(viewModel: WaveDropViewModel) {
                             activeActionFile = null
                         }
                     ) {
-                        Text(if (!file.content.isNullOrEmpty()) "Read text contents" else "Check Info")
+                        Text(if (!file.content.isNullOrEmpty()) "Read text contents" else "Open File")
                     }
                 },
                 dismissButton = {

@@ -17,6 +17,26 @@ class NsdDiscoveryManager(context: Context) {
 
     private var isResolving = false
     private val pendingResolves = mutableListOf<NsdServiceInfo>()
+    private var activeServiceName: String? = null
+
+    private fun getLocalIpAddress(): String {
+        try {
+            val interfaces = java.net.NetworkInterface.getNetworkInterfaces()
+            while (interfaces.hasMoreElements()) {
+                val intf = interfaces.nextElement()
+                val addrs = intf.inetAddresses
+                while (addrs.hasMoreElements()) {
+                    val addr = addrs.nextElement()
+                    if (!addr.isLoopbackAddress && addr is java.net.Inet4Address) {
+                        return addr.hostAddress ?: ""
+                    }
+                }
+            }
+        } catch (ex: Exception) {
+            ex.printStackTrace()
+        }
+        return "127.0.0.1"
+    }
 
     private fun resolveNext() {
         if (isResolving || pendingResolves.isEmpty()) return
@@ -32,10 +52,14 @@ class NsdDiscoveryManager(context: Context) {
 
                 override fun onServiceResolved(serviceInfo: NsdServiceInfo) {
                     Log.d("NSD", "Resolve Succeeded: $serviceInfo")
-                    val current = _discoveredDevices.value.toMutableList()
-                    if (current.none { it.serviceName == serviceInfo.serviceName }) {
-                        current.add(serviceInfo)
-                        _discoveredDevices.value = current
+                    val hostAddress = serviceInfo.host?.hostAddress ?: ""
+                    // Skip if it's our own registered service or own IP device
+                    if (serviceInfo.serviceName != activeServiceName && hostAddress != getLocalIpAddress()) {
+                        val current = _discoveredDevices.value.toMutableList()
+                        if (current.none { it.serviceName == serviceInfo.serviceName }) {
+                            current.add(serviceInfo)
+                            _discoveredDevices.value = current
+                        }
                     }
                     isResolving = false
                     resolveNext()
@@ -133,6 +157,7 @@ class NsdDiscoveryManager(context: Context) {
         }
         val serviceInfo = NsdServiceInfo().apply {
             this.serviceName = finalServiceName + "_" + (System.currentTimeMillis() % 1000)
+            activeServiceName = this.serviceName
             this.serviceType = this@NsdDiscoveryManager.serviceType
             this.port = port
         }

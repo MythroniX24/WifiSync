@@ -122,17 +122,15 @@ class WaveDropViewModel(application: Application, private val repository: WaveDr
             startHttpServer()
         }
         viewModelScope.launch(Dispatchers.IO) {
-            // Periodically clear old remote files and fetch new ones
+            // Periodically fetch new files to sync space
             while (isActive) {
                 val currentDevices = devices.value
-                // Only clear if we actually have devices to sync with
                 if (currentDevices.isNotEmpty()) {
-                    repository.clearRemoteFiles()
                     currentDevices.forEach { device ->
                         launch { fetchMetadataFromPeer(device) }
                     }
                 }
-                delay(15000) // Poll every 15 seconds
+                delay(10000) // Poll every 10 seconds
             }
         }
     }
@@ -321,8 +319,17 @@ class WaveDropViewModel(application: Application, private val repository: WaveDr
                 val json = readHeaderLine(input).trim()
                 if (json.isNotEmpty() && !json.startsWith("ERROR")) {
                     val remoteFiles = sharedFileListAdapter.fromJson(json) ?: emptyList()
-                    remoteFiles.forEach { file ->
-                        repository.addSharedFile(file.copy(isLocal = false, ownerDeviceName = device.name))
+                    val myLocalFiles = sharedFiles.value.filter { it.isLocal }
+                    remoteFiles.forEach { remoteFile ->
+                        // Automatically download files we don't have
+                        val alreadyHave = myLocalFiles.any { it.name == remoteFile.name }
+                        if (!alreadyHave && remoteFile.size > 0) {
+                            downloadSharedFile(remoteFile.copy(ownerDeviceName = device.name)) { success, _ -> 
+                                if (success) {
+                                    Log.d("WaveDropSync", "Auto background synced: ${remoteFile.name}")
+                                }
+                            }
+                        }
                     }
                 }
             }
