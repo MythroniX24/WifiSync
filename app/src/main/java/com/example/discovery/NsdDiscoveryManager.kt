@@ -111,10 +111,28 @@ class NsdDiscoveryManager(context: Context) {
         }
     }
 
-    fun registerService(port: Int) {
+    fun registerService(port: Int, customName: String) {
         if (isRegistered) return
+        val manufacturer = android.os.Build.MANUFACTURER
+        val model = android.os.Build.MODEL
+        var deviceModel = if (model.lowercase().startsWith(manufacturer.lowercase())) {
+            model
+        } else {
+            "${manufacturer} ${model}"
+        }
+        deviceModel = deviceModel.split(" ").joinToString(" ") { word ->
+            word.replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }
+        }
+        val safeModel = deviceModel.replace(Regex("[^a-zA-Z0-9-]"), "-").take(24)
+        
+        val sanitized = customName.replace("[^a-zA-Z0-9 -]".toRegex(), "").trim()
+        val finalServiceName = if (sanitized.isNotEmpty() && sanitized != "My Android Device" && sanitized != "Unnamed_Device" && sanitized != "My Application") {
+            sanitized
+        } else {
+            safeModel
+        }
         val serviceInfo = NsdServiceInfo().apply {
-            this.serviceName = this@NsdDiscoveryManager.serviceName + "_" + System.currentTimeMillis() % 1000
+            this.serviceName = finalServiceName + "_" + (System.currentTimeMillis() % 1000)
             this.serviceType = this@NsdDiscoveryManager.serviceType
             this.port = port
         }

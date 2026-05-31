@@ -196,6 +196,45 @@ fun SharedSpaceScreen(viewModel: WaveDropViewModel) {
                 }
             }
 
+            // Laptop Sharing Portal Info Card
+            val localIp = viewModel.localIpAddress
+            if (localIp != "127.0.0.1" && localIp != "Unknown IP") {
+                Card(
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.8f)
+                    ),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 6.dp),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "💻",
+                            fontSize = 26.sp,
+                            modifier = Modifier.padding(end = 12.dp)
+                        )
+                        Column {
+                            Text(
+                                text = "Windows PC Sharing Portal",
+                                fontWeight = FontWeight.Bold,
+                                style = MaterialTheme.typography.titleSmall,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = "Go to http://$localIp:9999 in your laptop browser to download/upload files instantly!",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.85f)
+                            )
+                        }
+                    }
+                }
+            }
+
             // Real-time live files filter box
             OutlinedTextField(
                 value = searchQuery,
@@ -253,14 +292,21 @@ fun SharedSpaceScreen(viewModel: WaveDropViewModel) {
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     items(sharedFiles) { file ->
-                        val itemColor = remember(file) {
-                            when {
-                                file.isFolder -> Color(0xFFFFECC2) 
-                                file.isFavorite -> Color(0xFFFFF4D2) 
-                                file.isLocal -> Color(0xFFE8F1FF) 
-                                else -> Color(0xFFE7F6E7) 
-                            }
+                        val containerColor = when {
+                            file.isFolder -> MaterialTheme.colorScheme.secondaryContainer
+                            file.isFavorite -> MaterialTheme.colorScheme.tertiaryContainer
+                            file.isLocal -> MaterialTheme.colorScheme.surfaceVariant
+                            else -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.15f)
                         }
+
+                        val onContainerColor = when {
+                            file.isFolder -> MaterialTheme.colorScheme.onSecondaryContainer
+                            file.isFavorite -> MaterialTheme.colorScheme.onTertiaryContainer
+                            file.isLocal -> MaterialTheme.colorScheme.onSurfaceVariant
+                            else -> MaterialTheme.colorScheme.onPrimaryContainer
+                        }
+
+                        val iconColor = if (file.isFolder) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary
 
                         val fileIcon = remember(file) {
                             when {
@@ -282,28 +328,54 @@ fun SharedSpaceScreen(viewModel: WaveDropViewModel) {
                                         activeActionFile = file
                                     }
                                 },
-                            colors = CardDefaults.cardColors(containerColor = itemColor)
+                            colors = CardDefaults.cardColors(
+                                containerColor = containerColor,
+                                contentColor = onContainerColor
+                            ),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
                         ) {
                             Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
                                 Icon(
                                     imageVector = fileIcon, 
                                     contentDescription = null,
-                                    tint = if (file.isFolder) Color(0xFFFFA000) else MaterialTheme.colorScheme.primary
+                                    tint = iconColor,
+                                    modifier = Modifier.size(28.dp)
                                 )
                                 Spacer(modifier = Modifier.width(16.dp))
                                 Column(modifier = Modifier.weight(1f)) {
                                     Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Text(file.name, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f, fill = false))
+                                        Text(
+                                            text = file.name, 
+                                            fontWeight = FontWeight.Bold, 
+                                            style = MaterialTheme.typography.titleMedium,
+                                            modifier = Modifier.weight(1f, fill = false),
+                                            color = onContainerColor
+                                        )
                                         if (file.isFavorite) {
-                                            Spacer(modifier = Modifier.width(4.dp))
-                                            Icon(Icons.Default.Favorite, contentDescription = "Favorite", tint = Color.Red, modifier = Modifier.size(14.dp))
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                            Icon(Icons.Default.Favorite, contentDescription = "Favorite", tint = Color.Red, modifier = Modifier.size(16.dp))
                                         }
                                     }
                                     if (!file.isFolder) {
-                                        val sourceTag = if (file.isLocal) "Offline Storage" else "P2P Peer File"
-                                        Text("${file.ownerDeviceName} • ${file.size} bytes • $sourceTag", style = MaterialTheme.typography.bodySmall)
+                                        val sourceTag = if (file.isLocal) "Local Space" else "P2P Peer File"
+                                        val sizeLabel = if (file.size > 1024 * 1024) {
+                                            String.format("%.2f MB", file.size / (1024.0 * 1024.0))
+                                        } else if (file.size > 1024) {
+                                            String.format("%.2f KB", file.size / 1024.0)
+                                        } else {
+                                            "${file.size} Bytes"
+                                        }
+                                        Text(
+                                            text = "$sizeLabel • $sourceTag • ${file.ownerDeviceName}", 
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = onContainerColor.copy(alpha = 0.8f)
+                                        )
                                     } else {
-                                        Text("${file.ownerDeviceName} • Folder directory", style = MaterialTheme.typography.bodySmall)
+                                        Text(
+                                            text = "Folder • Owner: ${file.ownerDeviceName}", 
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = onContainerColor.copy(alpha = 0.8f)
+                                        )
                                     }
                                 }
                                 
@@ -312,7 +384,7 @@ fun SharedSpaceScreen(viewModel: WaveDropViewModel) {
                                     Icon(
                                         imageVector = Icons.Default.Delete,
                                         contentDescription = "Delete Item",
-                                        tint = MaterialTheme.colorScheme.error.copy(alpha = 0.7f),
+                                        tint = MaterialTheme.colorScheme.error,
                                         modifier = Modifier.size(20.dp)
                                     )
                                 }

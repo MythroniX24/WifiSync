@@ -158,20 +158,50 @@ fun DevicesScreen(viewModel: WaveDropViewModel) {
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 items(devices) { device ->
+                    val rawName = device.name
+                    val ipPart = rawName.substringAfterLast("(").substringBefore(")")
+                    val rawDevicePart = rawName.substringBefore(" (")
+                    
+                    val cleanDeviceModel = if (rawDevicePart.contains("_")) {
+                        rawDevicePart.substringBeforeLast("_").replace("-", " ")
+                    } else {
+                        rawDevicePart.replace("-", " ")
+                    }
+                    val displayIp = if (ipPart != rawName) "IP: $ipPart" else "Local Network Peer"
+
                     Card(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clickable {
                                 selectedDeviceForSend = device
                                 directSendLauncher.launch("*/*")
-                            }
+                            },
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
                     ) {
-                        Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Default.Computer, contentDescription = "Device", tint = MaterialTheme.colorScheme.primary)
+                        Row(
+                            modifier = Modifier.padding(16.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Computer,
+                                contentDescription = "Device",
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(28.dp)
+                            )
                             Spacer(modifier = Modifier.width(16.dp))
                             Column {
-                                Text(device.name, fontWeight = FontWeight.SemiBold)
-                                Text("Click to drop / transfer a files directly", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text(
+                                    text = cleanDeviceModel,
+                                    fontWeight = FontWeight.Bold,
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Text(
+                                    text = "$displayIp • Tap to drop / transfer a files directly",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.secondary
+                                )
                             }
                         }
                     }
